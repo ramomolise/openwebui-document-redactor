@@ -31,7 +31,7 @@ ALLOW_NON_PRIVATE_OLLAMA_URL = false
 REDACT_UNLABELLED_CONTACTS = false
 ```
 
-For Docker, LAN Ollama, dependency installation and troubleshooting, follow the [full setup guide](SETUP.md).
+For complete Function installation, configuration and troubleshooting, follow the [setup guide](SETUP.md).
 
 ## Use
 
