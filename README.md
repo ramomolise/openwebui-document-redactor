@@ -1,8 +1,10 @@
 # OpenWebUI Document Redactor
 
-An OpenWebUI Function that removes candidate information from PDF and DOCX files without rebuilding or rewriting the document.
+An OpenWebUI Function that removes personal data from PDF and DOCX files without rebuilding or rewriting the document.
 
-It keeps the original layout, scores, charts, wording and gendered pronouns. Names and source identifiers are replaced with a reference such as `CAND-042817`.
+It provides a practical privacy layer before documents are used with powerful cloud AI models, helping prevent identifiable information from being sent to external providers.
+
+The original layout, scores, charts, wording and gendered pronouns are preserved. Names and source identifiers can be replaced with a reference such as `CAND-042817`.
 
 ## Features
 
