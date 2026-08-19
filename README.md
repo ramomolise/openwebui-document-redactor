@@ -1,16 +1,14 @@
 # OpenWebUI Document Redactor
 
-An OpenWebUI Function that removes personal data from PDF and DOCX files without rebuilding or rewriting the document.
+An OpenWebUI Function that removes personal and identifying information from PDF and DOCX files without rebuilding or rewriting the document.
 
-It provides a practical privacy layer before documents are used with powerful cloud AI models, helping prevent identifiable information from being sent to external providers.
-
-The original layout, scores, charts, wording and gendered pronouns are preserved. Names and source identifiers can be replaced with a reference such as `CAND-042817`.
+It keeps the original layout and substantive content. The primary person's name and source identifier are replaced with an external reference such as `EXT-7F92-KQ4D`; other sensitive values are physically redacted.
 
 ## Features
 
 - Preserves the original PDF or DOCX design.
-- Redacts names, IDs, contact details, dates and selected biographical information.
-- Keeps scores, assessment wording, charts, recommendations and pronouns unchanged.
+- Redacts names, IDs, contact details, birth dates and selected biographical information.
+- Keeps non-sensitive wording, tables, charts, figures and pronouns unchanged.
 - Uses true PDF redaction, not removable black overlays.
 - Removes metadata, hidden text, attachments, scripts and form values.
 - Uses a private Ollama model to find additional identifiers.
@@ -21,13 +19,14 @@ The original layout, scores, charts, wording and gendered pronouns are preserved
 
 1. Make sure OpenWebUI can reach Ollama through localhost or a private LAN address.
 2. In OpenWebUI, open **Admin Panel -> Functions -> Create Function**.
-3. Paste the contents of [`assessment_redactor_pipe.py`](openwebui_redactor/assessment_redactor_pipe.py).
+3. Paste the contents of [`redactor_pipe.py`](openwebui_redactor/redactor_pipe.py).
 4. Save and enable **Document Redactor**.
 5. Configure these valves:
 
 ```text
-OLLAMA_BASE_URL = http://host.docker.internal:11434
+OLLAMA_BASE_URL = http://127.0.0.1:11434
 MODEL = gemma4:12b
+REFERENCE_PREFIX = EXT
 REQUIRE_LLM_PASS = true
 ALLOW_NON_PRIVATE_OLLAMA_URL = false
 REDACT_UNLABELLED_CONTACTS = false
@@ -42,10 +41,10 @@ For complete Function installation, configuration and troubleshooting, follow th
 3. Send `Redact`.
 4. Download and manually compare the result with the original.
 
-To choose the reference number, send:
+To choose the external reference, send:
 
 ```text
-Candidate ID: CAND-0042
+Reference ID: EXT-7F92-KQ4D
 ```
 
 ## Important

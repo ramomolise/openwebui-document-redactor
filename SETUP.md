@@ -12,7 +12,7 @@ This guide assumes OpenWebUI and Ollama are already installed and working.
 
 ## Add the Function to OpenWebUI
 
-1. Open [`assessment_redactor_pipe.py`](openwebui_redactor/assessment_redactor_pipe.py).
+1. Open [`redactor_pipe.py`](openwebui_redactor/redactor_pipe.py).
 2. Copy the complete file contents.
 3. Sign in to OpenWebUI as an administrator.
 4. Open **Admin Panel -> Functions**.
@@ -27,19 +27,15 @@ This guide assumes OpenWebUI and Ollama are already installed and working.
 Use the Ollama address that OpenWebUI can reach:
 
 ```text
-OLLAMA_BASE_URL = http://host.docker.internal:11434
+OLLAMA_BASE_URL = http://127.0.0.1:11434
 MODEL = gemma4:12b
-CANDIDATE_PREFIX = CAND
+REFERENCE_PREFIX = EXT
 REQUIRE_LLM_PASS = true
 ALLOW_NON_PRIVATE_OLLAMA_URL = false
 REDACT_UNLABELLED_CONTACTS = false
 ```
 
-If Ollama runs on another machine, replace `host.docker.internal` with its private LAN address:
-
-```text
-http://192.168.1.50:11434
-```
+If OpenWebUI runs in a container or Ollama runs on another trusted machine, replace the loopback address with the private hostname or private LAN address that your OpenWebUI deployment can reach.
 
 Do not add `/v1` to the address. Do not use a public Ollama endpoint for documents containing personal information.
 
@@ -56,12 +52,12 @@ Do not add `/v1` to the address. Do not use a public Ollama endpoint for documen
 Redact
 ```
 
-The Function generates a reference such as `CAND-042817` and returns a download link.
+The Function generates a reference such as `EXT-7F92-KQ4D` and returns a download link.
 
 To choose the reference yourself, send:
 
 ```text
-Candidate ID: CAND-0042
+Reference ID: EXT-7F92-KQ4D
 ```
 
 Download the redacted file and compare it with the original before using it.
@@ -87,4 +83,4 @@ Use Document Redactor only as a file-processing utility. Disable unrelated featu
 
 ## After downloading
 
-OpenWebUI stores uploaded and generated files. Delete the chat and its files when required by your retention policy. Keep the candidate-reference mapping outside the AI conversation.
+OpenWebUI stores uploaded and generated files. Delete the chat and its files when required by your retention policy. Keep any reference-to-person mapping outside the AI conversation.

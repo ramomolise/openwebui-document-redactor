@@ -22,5 +22,5 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -r requirements-dev.txt
-      - run: python -m py_compile openwebui_redactor/assessment_redactor_pipe.py
+      - run: python -m py_compile openwebui_redactor/redactor_pipe.py
       - run: python -m unittest discover -s openwebui_redactor/tests -v
