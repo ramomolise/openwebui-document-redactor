@@ -9,39 +9,37 @@ import fitz
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-from openwebui_redactor.assessment_redactor_pipe import (
+from openwebui_redactor.redactor_pipe import (
     deterministic_entities,
     extract_docx_text,
     extract_pdf_text,
+    generate_reference_id,
     redact_docx,
     redact_pdf,
+    reference_id_from_message,
 )
 
 
 SOURCE_TEXT = (
-    "Cognitive Process Profile (CPP)\n"
-    "Standard Report for Example Organisation\n"
+    "Client Account Summary\n"
     "STRICTLY CONFIDENTIAL\n"
-    "NAME: Alex Taylor    CPP NUMBER: CPP-77821\n"
-    "EMAIL: candidate@example.com\n"
+    "NAME: Alex Taylor    CUSTOMER NUMBER: CUST-77821\n"
+    "EMAIL: alex.taylor@example.com\n"
     "PHONE: +27 00 000 0000\n"
     "ID NUMBER: TEST-ID-0001\n"
-    "ASSESSMENT DATE: 2022-07-25\n"
-    "REPORT DATE: 2022-08-01\n"
+    "DATE OF BIRTH: 1990-07-25\n"
+    "DOCUMENT DATE: 2022-08-01\n"
     "Gender: Female\n"
     "Nationality: South Africa\n"
     "Ethnicity: Black African\n"
     "Highest education: Multiple Degrees / Postgraduate\n"
     "Discipline: Psychology / Social Science\n"
-    "Functional area: Human Resources\n"
+    "Department: Human Resources\n"
     "Current position: Trainee\n"
-    "Colour blind: No\n"
-    "Previous CPP: No\n"
-    "How well could you concentrate? Not very well\n\n"
-    "Alex Taylor obtained a percentile score of 73.\n"
-    "No changes are required to the score wording.\n"
-    "The assessment wording and score must remain unchanged.\n"
-    "Publisher telephone: +27 11 000 0000"
+    "Employer: Example Organisation\n\n"
+    "Alex Taylor has an approved limit of R125 000.\n"
+    "The document wording and financial figures must remain unchanged.\n"
+    "Service provider telephone: +27 11 000 0000"
 )
 
 
@@ -49,26 +47,33 @@ class RedactionEngineTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
-        self.candidate_id = "CAND-0042"
+        self.reference_id = "EXT-7F92-KQ4D"
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
+    def test_external_reference_generation_and_override(self) -> None:
+        generated = generate_reference_id()
+        self.assertRegex(generated, r"^EXT-[A-Z2-9]{4}-[A-Z2-9]{4}$")
+        self.assertEqual(
+            reference_id_from_message("Reference ID: EXT-7F92-KQ4D"),
+            "EXT-7F92-KQ4D",
+        )
+
     def test_deterministic_detection(self) -> None:
         entities = deterministic_entities(SOURCE_TEXT)
         values = {(entity.text, entity.category) for entity in entities}
-        self.assertIn(("Alex Taylor", "CANDIDATE_NAME"), values)
-        self.assertIn(("CPP-77821", "CANDIDATE_ID"), values)
-        self.assertIn(("candidate@example.com", "EMAIL"), values)
+        self.assertIn(("Alex Taylor", "SUBJECT_NAME"), values)
+        self.assertIn(("CUST-77821", "SUBJECT_ID"), values)
+        self.assertIn(("alex.taylor@example.com", "EMAIL"), values)
         self.assertIn(("+27 00 000 0000", "PHONE"), values)
         self.assertIn(("TEST-ID-0001", "NATIONAL_ID"), values)
         self.assertNotIn(("+27 11 000 0000", "PHONE"), values)
-        self.assertIn(("2022-07-25", "ASSESSMENT_DATE"), values)
-        self.assertIn(("2022-08-01", "REPORT_DATE"), values)
+        self.assertIn(("1990-07-25", "DATE_OF_BIRTH"), values)
         self.assertIn(("Female", "GENDER"), values)
         self.assertIn(("Black African", "ETHNICITY"), values)
-        self.assertIn(("Not very well", "SELF_EVALUATION"), values)
-        self.assertNotIn(("2022-07-25", "DATE_OF_BIRTH"), values)
+        self.assertIn(("Example Organisation", "AFFILIATION"), values)
+        self.assertNotIn(("2022-08-01", "DATE_OF_BIRTH"), values)
 
     def _make_pdf(self, path: Path) -> None:
         document = fitz.open()
@@ -80,16 +85,16 @@ class RedactionEngineTests(unittest.TestCase):
             fontsize=10,
             lineheight=1.4,
         )
-        document.set_metadata({"author": "Alex Taylor", "title": "Alex Taylor CPP"})
+        document.set_metadata({"author": "Alex Taylor", "title": "Alex Taylor Client Record"})
         document.save(path)
         document.close()
 
-    def test_pdf_redaction_preserves_page_and_scores(self) -> None:
+    def test_pdf_redaction_preserves_page_and_content(self) -> None:
         source = self.root / "source.pdf"
         output = self.root / "output.pdf"
         self._make_pdf(source)
         text, _ = extract_pdf_text(source)
-        result = redact_pdf(source, output, deterministic_entities(text), self.candidate_id)
+        result = redact_pdf(source, output, deterministic_entities(text), self.reference_id)
 
         original = fitz.open(source)
         redacted = fitz.open(output)
@@ -98,18 +103,17 @@ class RedactionEngineTests(unittest.TestCase):
             self.assertEqual(original[0].rect, redacted[0].rect)
             redacted_text = redacted[0].get_text("text")
             self.assertNotIn("Alex Taylor", redacted_text)
-            self.assertNotIn("CPP-77821", redacted_text)
-            self.assertNotIn("candidate@example.com", redacted_text)
-            self.assertIn(self.candidate_id, redacted_text)
-            self.assertIn("percentile score of 73", redacted_text)
-            self.assertNotIn("2022-07-25", redacted_text)
-            self.assertNotIn("2022-08-01", redacted_text)
+            self.assertNotIn("CUST-77821", redacted_text)
+            self.assertNotIn("alex.taylor@example.com", redacted_text)
+            self.assertIn(self.reference_id, redacted_text)
+            self.assertIn("approved limit of R125 000", redacted_text)
+            self.assertNotIn("1990-07-25", redacted_text)
+            self.assertIn("2022-08-01", redacted_text)
             self.assertNotIn("Example Organisation", redacted_text)
             self.assertNotIn("Female", redacted_text)
             self.assertNotIn("Black African", redacted_text)
-            self.assertNotIn("Not very well", redacted_text)
-            self.assertIn("No changes are required", redacted_text)
-            self.assertIn("Publisher telephone: +27 11 000 0000", redacted_text)
+            self.assertIn("document wording and financial figures", redacted_text)
+            self.assertIn("Service provider telephone: +27 11 000 0000", redacted_text)
             self.assertFalse(redacted.metadata.get("author"))
             self.assertGreater(sum(result.counts.values()), 0)
         finally:
@@ -123,27 +127,26 @@ class RedactionEngineTests(unittest.TestCase):
         header.text = "STRICTLY CONFIDENTIAL — Alex Taylor"
         header.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-        title = document.add_heading("Cognitive Process Profile", level=1)
+        title = document.add_heading("Client Account Summary", level=1)
         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
         paragraph = document.add_paragraph("NAME: ")
         paragraph.add_run("Alex ").bold = True
         paragraph.add_run("Taylor").bold = True
-        paragraph.add_run("    CPP NUMBER: CPP-77821")
+        paragraph.add_run("    CUSTOMER NUMBER: CUST-77821")
 
         table = document.add_table(rows=3, cols=2)
         table.style = "Table Grid"
         table.cell(0, 0).text = "Email"
-        table.cell(0, 1).text = "candidate@example.com"
+        table.cell(0, 1).text = "alex.taylor@example.com"
         table.cell(1, 0).text = "Phone"
         table.cell(1, 1).text = "+27 00 000 0000"
         table.cell(2, 0).text = "ID Number"
         table.cell(2, 1).text = "TEST-ID-0001"
 
-        document.add_paragraph("Standard Report for Example Organisation")
-        document.add_paragraph("ASSESSMENT DATE: 2022-07-25")
-        document.add_paragraph("REPORT DATE: 2022-08-01")
+        document.add_paragraph("DATE OF BIRTH: 1990-07-25")
+        document.add_paragraph("DOCUMENT DATE: 2022-08-01")
 
-        biography = document.add_table(rows=9, cols=2)
+        biography = document.add_table(rows=8, cols=2)
         biography.style = "Table Grid"
         for row, (label, value) in enumerate(
             (
@@ -152,21 +155,19 @@ class RedactionEngineTests(unittest.TestCase):
                 ("Ethnicity", "Black African"),
                 ("Highest education", "Multiple Degrees / Postgraduate"),
                 ("Discipline", "Psychology / Social Science"),
-                ("Functional area", "Human Resources"),
+                ("Department", "Human Resources"),
                 ("Current position", "Trainee"),
-                ("Colour blind", "No"),
-                ("Previous CPP", "No"),
+                ("Employer", "Example Organisation"),
             )
         ):
             biography.cell(row, 0).text = label
             biography.cell(row, 1).text = value
 
-        document.add_paragraph("How well could you concentrate? Not very well")
-        document.add_paragraph("Alex Taylor obtained a percentile score of 73.")
-        document.add_paragraph("No changes are required to the score wording.")
-        document.add_paragraph("Publisher telephone: +27 11 000 0000")
+        document.add_paragraph("Alex Taylor has an approved limit of R125 000.")
+        document.add_paragraph("The document wording and financial figures must remain unchanged.")
+        document.add_paragraph("Service provider telephone: +27 11 000 0000")
         document.core_properties.author = "Alex Taylor"
-        document.core_properties.title = "Alex Taylor CPP"
+        document.core_properties.title = "Alex Taylor Client Record"
         document.save(path)
 
     def test_docx_redaction_preserves_structure_and_split_runs(self) -> None:
@@ -175,7 +176,7 @@ class RedactionEngineTests(unittest.TestCase):
         self._make_docx(source)
 
         text, _ = extract_docx_text(source)
-        result = redact_docx(source, output, deterministic_entities(text), self.candidate_id)
+        result = redact_docx(source, output, deterministic_entities(text), self.reference_id)
         source_doc = Document(source)
         output_doc = Document(output)
 
@@ -186,18 +187,17 @@ class RedactionEngineTests(unittest.TestCase):
 
         output_text, _ = extract_docx_text(output)
         self.assertNotIn("Alex Taylor", output_text)
-        self.assertNotIn("CPP-77821", output_text)
-        self.assertNotIn("candidate@example.com", output_text)
-        self.assertIn(self.candidate_id, output_text)
-        self.assertIn("percentile score of 73", output_text)
-        self.assertNotIn("2022-07-25", output_text)
-        self.assertNotIn("2022-08-01", output_text)
+        self.assertNotIn("CUST-77821", output_text)
+        self.assertNotIn("alex.taylor@example.com", output_text)
+        self.assertIn(self.reference_id, output_text)
+        self.assertIn("approved limit of R125 000", output_text)
+        self.assertNotIn("1990-07-25", output_text)
+        self.assertIn("2022-08-01", output_text)
         self.assertNotIn("Example Organisation", output_text)
         self.assertNotIn("Female", output_text)
         self.assertNotIn("Black African", output_text)
-        self.assertNotIn("Not very well", output_text)
-        self.assertIn("No changes are required", output_text)
-        self.assertIn("Publisher telephone: +27 11 000 0000", output_text)
+        self.assertIn("document wording and financial figures", output_text)
+        self.assertIn("Service provider telephone: +27 11 000 0000", output_text)
         self.assertFalse(output_doc.core_properties.author)
         self.assertGreater(sum(result.counts.values()), 0)
 
@@ -208,7 +208,7 @@ class RedactionEngineTests(unittest.TestCase):
                 if item.filename.endswith(".xml") or item.filename.endswith(".rels")
             )
         self.assertNotIn(b"Alex Taylor", all_xml)
-        self.assertNotIn(b"candidate@example.com", all_xml)
+        self.assertNotIn(b"alex.taylor@example.com", all_xml)
 
 
 if __name__ == "__main__":
